@@ -1,36 +1,53 @@
-name: Unzip Project Automatically
+name: Build APK
+
 on:
   push:
-    branches:
-      - main
-
-permissions:
-  contents: write
+    branches: [main, master]
+  workflow_dispatch:
 
 jobs:
-  unzip:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Check and Unzip File
-        run: |
-          for f in *.zip; do
-            if [ -f "$f" ]; then
-              echo "Zip file found: $f Unzipping..."
-              unzip -o "$f"
-              rm "$f"
-            else
-              echo "No zip file found."
-              exit 0
-            fi
-          done
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
 
-      - name: Commit and Push Unzipped Files
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Create Android folder if missing
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add .
-          git diff-index --quiet HEAD || git commit -m "Automatically unzipped project files and removed zip"
-          git push
+          if [ ! -d android ]; then
+            mkdir -p /tmp/bak && cp -r lib /tmp/bak/lib && cp pubspec.yaml /tmp/bak/ 2>/dev/null || true
+            flutter create --org com.smrafiu --project-name habit_tracker --platforms=android .
+            rm -rf lib && cp -r /tmp/bak/lib lib
+            [ -f /tmp/bak/pubspec.yaml ] && cp /tmp/bak/pubspec.yaml pubspec.yaml || true
+          fi
+
+      - name: Set app name and package name
+        run: |
+          sed -i 's/android:label="[^"]*"/android:label="Habit Tracker"/' android/app/src/main/AndroidManifest.xml
+          sed -i -E 's/applicationId\s*=?\s*"[^"]*"/applicationId = "com.smrafiu.habit_tracker"/' android/app/build.gradle*
+
+      - name: Prepare project
+        run: |
+          rm -f test/widget_test.dart
+          grep -q shared_preferences pubspec.yaml || flutter pub add shared_preferences
+          flutter pub get
+
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Rename APK
+        run: cp build/app/outputs/flutter-apk/app-release.apk HabitTracker.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HabitTracker-apk
+          path: HabitTracker.apk
