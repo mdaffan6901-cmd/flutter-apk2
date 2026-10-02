@@ -1,0 +1,36 @@
+name: Unzip Project Automatically
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  unzip:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Check and Unzip File
+        run: |
+          for f in *.zip; do
+            if [ -f "$f" ]; then
+              echo "Zip file found: $f Unzipping..."
+              unzip -o "$f"
+              rm "$f"
+            else
+              echo "No zip file found."
+              exit 0
+            fi
+          done
+
+      - name: Commit and Push Unzipped Files
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git diff-index --quiet HEAD || git commit -m "Automatically unzipped project files and removed zip"
+          git push
