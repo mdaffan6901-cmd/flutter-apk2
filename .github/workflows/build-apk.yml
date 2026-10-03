@@ -41,6 +41,16 @@ jobs:
           grep -q shared_preferences pubspec.yaml || flutter pub add shared_preferences
           flutter pub get
 
+      - name: Generate app icon from logo.png
+        run: |
+          if [ -f logo.png ]; then
+            mkdir -p assets/icon
+            cp logo.png assets/icon/icon.png
+            flutter pub add --dev flutter_launcher_icons
+            printf 'flutter_launcher_icons:\n  android: true\n  ios: false\n  image_path: "assets/icon/icon.png"\n  adaptive_icon_background: "#FFFFFF"\n  adaptive_icon_foreground: "assets/icon/icon.png"\n' > flutter_launcher_icons.yaml
+            dart run flutter_launcher_icons -f flutter_launcher_icons.yaml
+          fi
+
       - name: Build release APK
         run: flutter build apk --release
 
